@@ -3,163 +3,104 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live Video AI Analyzer - Gemini</title>
-    <style>
-        body { 
-            font-family: 'Segoe UI', Arial, sans-serif; 
-            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); 
-            color: #fff; 
-            margin: 0; 
-            padding: 20px; 
-            min-height: 100vh;
-            display: flex; 
-            flex-direction: column; 
-            align-items: center; 
-        }
-        .container { max-width: 800px; text-align: center; }
-        h1 { font-size: 2.5em; margin-bottom: 10px; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
-        #video { 
-            width: 640px; 
-            height: 480px; 
-            border: 3px solid #00d4ff; 
-            border-radius: 15px; 
-            background: #000; 
-            box-shadow: 0 10px 30px rgba(0,212,255,0.3);
-        }
-        #insights { 
-            margin-top: 25px; 
-            padding: 25px; 
-            background: rgba(30,30,50,0.9); 
-            border-radius: 15px; 
-            max-width: 640px; 
-            min-height: 120px; 
-            border-left: 6px solid #00d4ff; 
-            text-align: left;
-            overflow-y: auto;
-            max-height: 400px;
-        }
-        .insight { 
-            background: rgba(0,212,255,0.1); 
-            padding: 12px; 
-            margin: 10px 0; 
-            border-radius: 8px; 
-            border-left: 4px solid #00d4ff;
-        }
-        button { 
-            background: linear-gradient(45deg, #00d4ff, #0099cc); 
-            color: white; 
-            border: none; 
-            padding: 15px 30px; 
-            font-size: 16px; 
-            border-radius: 30px; 
-            cursor: pointer; 
-            margin: 10px; 
-            box-shadow: 0 5px 15px rgba(0,212,255,0.3);
-            transition: all 0.3s;
-        }
-        button:hover:not(:disabled) { 
-            transform: translateY(-2px); 
-            box-shadow: 0 8px 25px rgba(0,212,255,0.4);
-        }
-        button:disabled { 
-            background: #666; 
-            cursor: not-allowed; 
-            box-shadow: none;
-        }
-        #status { 
-            color: #00ff88; 
-            font-weight: bold; 
-            font-size: 1.2em;
-            margin: 15px 0;
-        }
-        .instructions {
-            background: rgba(255,255,255,0.1);
-            padding: 15px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-            backdrop-filter: blur(10px);
-        }
-    </style>
+    <title>AI SCOUT | Visual Guide</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body>
     <div class="container">
-        <h1>🎥 Gemini Live Video Analyzer</h1>
-        <div class="instructions">
-            Click start → Allow camera → Watch AI insights appear every 3 seconds!
+        <header>
+            <div class="logo">AI<span>SCOUT</span></div>
+            <p>Visual Intelligence for Explorers</p>
+        </header>
+
+        <div class="viewport-box">
+            <video id="video" autoplay muted playsinline></video>
+            <div class="hud">LENS ACTIVE</div>
         </div>
-        <video id="video" autoplay muted playsinline></video>
-        <br>
-        <button id="startBtn">▶️ Start Camera</button>
-        <button id="stopBtn" disabled>⏹️ Stop</button>
-        <div id="status">Ready to analyze with Gemini AI</div>
-        <div id="insights">AI insights will stream here...</div>
+
+        <div class="actions">
+            <button id="startCam" class="btn-sec">Start Lens</button>
+            <button id="analyze" class="btn-pri" disabled>📸 Analyze Scene</button>
+        </div>
+    </div>
+
+    <div id="modal" class="modal-overlay">
+        <div class="modal-card">
+            <button id="close" class="close-btn">&times;</button>
+            <div id="loader" class="loader-wrap">
+                <div class="spinner"></div>
+                <p>Accessing Global Archives...</p>
+            </div>
+            <div id="output" style="display:none;">
+                <div id="histFrame" class="historical-frame" style="display:none;">
+                    <h4>HISTORICAL REFERENCE</h4>
+                    <img id="histImg" src="" alt="History">
+                </div>
+                <div id="textRes" class="markdown-body"></div>
+            </div>
+        </div>
     </div>
 
     <script>
         const video = document.getElementById('video');
-        const startBtn = document.getElementById('startBtn');
-        const stopBtn = document.getElementById('stopBtn');
-        const status = document.getElementById('status');
-        const insights = document.getElementById('insights');
-        let stream, interval;
+        const startCam = document.getElementById('startCam');
+        const analyze = document.getElementById('analyze');
+        const modal = document.getElementById('modal');
+        const textRes = document.getElementById('textRes');
+        const loader = document.getElementById('loader');
+        const output = document.getElementById('output');
+        const histImg = document.getElementById('histImg');
+        const histFrame = document.getElementById('histFrame');
 
-        startBtn.onclick = async () => {
-            try {
-                stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { width: 640, height: 480, facingMode: 'user' } 
-                });
-                video.srcObject = stream;
-                startBtn.disabled = true;
-                stopBtn.disabled = false;
-                status.textContent = '🔍 Gemini analyzing live feed...';
-                analyzeInterval();
-            } catch(err) {
-                status.textContent = '❌ Camera access denied';
-                console.error(err);
-            }
-        };
+        let stream;
 
-        stopBtn.onclick = () => {
+        startCam.onclick = async () => {
             if (stream) {
-                stream.getTracks().forEach(track => track.stop());
+                stream.getTracks().forEach(t => t.stop());
                 video.srcObject = null;
+                stream = null;
+                startCam.innerText = "Start Lens";
+                analyze.disabled = true;
+            } else {
+                stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+                video.srcObject = stream;
+                startCam.innerText = "Stop Lens";
+                analyze.disabled = false;
             }
-            clearInterval(interval);
-            startBtn.disabled = false;
-            stopBtn.disabled = true;
-            status.textContent = '⏸️ Stopped';
         };
 
-        async function analyzeInterval() {
-            interval = setInterval(async () => {
-                const canvas = document.createElement('canvas');
-                canvas.width = 640;
-                canvas.height = 480;
-                canvas.getContext('2d').drawImage(video, 0, 0);
-                const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+        analyze.onclick = async () => {
+            modal.style.display = 'flex';
+            loader.style.display = 'block';
+            output.style.display = 'none';
 
-                try {
-                    status.textContent = '🤖 Sending to Gemini...';
-                    const res = await fetch('/analyze', {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({image: dataUrl})
-                    });
-                    const {insight} = await res.json();
-                    const time = new Date().toLocaleTimeString();
-                    insights.innerHTML += `
-                        <div class="insight">
-                            <strong>${time}</strong><br>${insight}
-                        </div>
-                    `;
-                    insights.scrollTop = insights.scrollHeight;
-                    status.textContent = '🔍 Gemini analyzing live feed...';
-                } catch(err) {
-                    status.textContent = '❌ Analysis failed';
-                    console.error(err);
-                }
-            }, 3000);
-        }
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0);
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+
+            const res = await fetch('/analyze', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({image: dataUrl})
+            });
+            const data = await res.json();
+
+            loader.style.display = 'none';
+            output.style.display = 'block';
+            textRes.innerHTML = marked.parse(data.insight);
+
+            if (data.historical_image) {
+                histImg.src = data.historical_image;
+                histFrame.style.display = 'block';
+            } else {
+                histFrame.style.display = 'none';
+            }
+        };
+
+        document.getElementById('close').onclick = () => modal.style.display = 'none';
     </script>
 </body>
 </html>
